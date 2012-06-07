@@ -1,4 +1,5 @@
 reference
+.*
 *.swp
 *.swo
 *.class
