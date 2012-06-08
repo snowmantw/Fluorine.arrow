@@ -1,24 +1,32 @@
 
+
+// Modify Backbone style from use pure sting event to event object can go with data.
 Notifier = {};
 _.extend( Notifier, Backbone.Events );
 
+// Callback:: (String, {'name': String...}) -> {'name': String...}
 Notifier.on = function(name, callback){
-    
-
     Backbone.Events.on.call(Notifier, name, callback);
 }
 
-Arrow = function(first_n, first_p){
-    first_n.__triggered = [];
-    this.n_seq = [first_n];
-    this.p_seq = [first_p];
+// {'name': String...}
+Notifier.trigger = function(note){
+    Backbone.Events.trigger.call(Notifier, note.name, note);
+}
+
+Arrow = function(n_seq, p_seq){
+    _.each(n_seq, function(waits){ waits.__triggered = []; 
+                                   waits.__triggered.empty = function(){this.length = 0; } 
+    } );
+
+    this.n_seq = n_seq;
+    this.p_seq = p_seq;
 }
 
 // Note -> [ Note-> Note () ]
 Arrow.one2many = function(n, ps){
     _.each(ps, function(p){
-        var note = p(n);
-        Notifier.trigger(p(n).name,note);
+        Notifier.trigger(p(n));
     });
 }
 
@@ -30,6 +38,20 @@ Arrow.many2many = function(ns, ps){
         Arrow.one2many(n,ps);
     });
 }
+
+/* Should we have many2one ? Composed handler should handle many-many by itself.
+ *
+// The original event triggering has no many2one machanism...
+Arrow.many2one = function(ns, p){
+    
+    Notifier.trigger(p({'name': Arrow.concat_notes(ns), 'notes': ns}));
+}
+
+// [ Note ] -> Note
+Arrow.concat_notes = function(ns){
+    //return _.reduce(ns, function(memo_name, n){ return memo_name+'_'+n.name; }, "");
+}
+*/
 
 // ([String], [Note]) -> [Note] OR []
 Arrow.or = function(waits, triggers){
@@ -62,7 +84,10 @@ Arrow.and = function(waits, triggers){
     return result;
 }
 
-// note : {'name': String ...}
+// data of composed notes such as node_a AND node_b -> _a_b 
+//   will put in 'data' field and can be identified by index.
+//
+// note : {'name': String, 'data': [ {... node N's data} ] }
 
 //first:: a b c -> a (b, d) (c, d)
 Arrow.prototype.first = function(arr){
@@ -78,8 +103,9 @@ Arrow.prototype.first = function(arr){
 //(>>>):: a b c -> a c d -> a b d
 Arrow.prototype.next = function(arr){
     
-    return new Arrow( this.n_seq.concat(arr.n_seq),
-                      this.p_seq.concat(arr.p_seq));
+    return new Arrow( this.n_seq.concat( arr.n_seq ) ,
+                      this.p_seq.concat( arr.p_seq ) 
+                    );
 }
 
 //(***):: a b c -> a b' c' -> a (b, b') (c, c') 
@@ -106,6 +132,7 @@ Arrow.prototype.run = function(){
                     {
                         // handle all events triggered.
                         Arrow.many2many(waits.__triggered,THIS.p_seq[idx]);
+                        waits.__triggered.empty();
                     }
 
                 } else { 
@@ -113,6 +140,7 @@ Arrow.prototype.run = function(){
                     {
                         // OR will only trigger one event to all callback.
                         Arrow.one2many(note,THIS.p_seq[idx]);
+                        waits.__triggered.empty();
                     }
                 }
             });
