@@ -124,9 +124,9 @@ Arrow.prototype.split = function(arr){
 Arrow.prototype.run = function(){
     
     if( 0 == this.n_seq.length ) { return ; }
-    var waits =  this.n_seq.shift(); // get first notes and processors.
-    var procs = this.p_seq.shift();
-    this.bind( waits, procs );
+    this.current_waits =  this.n_seq.shift(); // get first notes and processors.
+    this.current_procs = this.p_seq.shift();
+    this.bind( this.current_waits, this.current_procs );
 }
 
 Arrow.prototype.wrap_p = function(p){
@@ -134,10 +134,10 @@ Arrow.prototype.wrap_p = function(p){
 
     return function(){
         var result = p.apply({},arguments); 
-        THIS.ipc --;
+        this.ipc --;
 
         // shift out current waits and procs to make next run.
-        if( 0 == THIS.ipc) {
+        if( 0 == this.ipc) {
             THIS.run();
         }
 
