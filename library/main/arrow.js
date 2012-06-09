@@ -21,6 +21,9 @@ Arrow = function(n_seq, p_seq){
 
     this.n_seq = n_seq;
     this.p_seq = p_seq;
+
+    // count down to zero if current triggered procs are all done.
+    this.ipc = 0; 
 }
 
 // Note -> [ Note-> Note () ]
@@ -115,35 +118,64 @@ Arrow.prototype.split = function(arr){
                       Arrow.and_merge(this.p_seq, arr.p_seq));
 }
 
-// waits.__triggered is needed.
+
+// run ONCE: every triggered processors should check 
+//   if itself is the last one, and call bind function to bind next waits.
 Arrow.prototype.run = function(){
     
+    if( 0 == this.n_seq.length ) { return ; }
+    var waits =  this.n_seq.shift(); // get first notes and processors.
+    var procs = this.p_seq.shift();
+    this.bind( waits, procs );
+}
+
+Arrow.prototype.wrap_p = function(p){
     var THIS = this;
-    _.each(this.n_seq, function(waits, idx){
-        _.each(waits, function(wait){
-            Notifier.on(wait, function(note){
-                if( ! waits.__or ){ // is AND list.
-                    
-                    waits.__triggered.push(note);
 
-                    // AND will trigger all events to all callback. 
-                    // check if all events match the waits.
-                    if( 0 != Arrow.and(waits, waits.__triggered ).length )
-                    {
-                        // handle all events triggered.
-                        Arrow.many2many(waits.__triggered,THIS.p_seq[idx]);
-                        waits.__triggered.empty();
-                    }
+    return function(){
+        var result = p.apply({},arguments); 
+        THIS.ipc --;
 
-                } else { 
-                    if( 0 != Arrow.or(waits, [note]).length )
-                    {
-                        // OR will only trigger one event to all callback.
-                        Arrow.one2many(note,THIS.p_seq[idx]);
-                        waits.__triggered.empty();
-                    }
+        // shift out current waits and procs to make next run.
+        if( 0 == THIS.ipc) {
+            THIS.run();
+        }
+
+        return result;
+    };
+}
+
+// waits.__triggered is needed.
+Arrow.prototype.bind = function(waits, procs){
+
+    this.ipc = procs.length;
+
+    var THIS = this;
+
+    _.each(waits, function(wait){
+        Notifier.on(wait, function(note){
+
+            if( ! waits.__or ){ // is AND list.
+
+                waits.__triggered.push(note);   // Only AND need to save triggered notes.
+
+                // AND will trigger all events to all callback. 
+                // check if all events match the waits.
+                if( 0 != Arrow.and(waits, waits.__triggered ).length )
+                {
+                    // handle all events triggered.
+                    Arrow.many2many(waits.__triggered,_.map( procs, THIS.wrap_p, THIS) );
+                    waits.__triggered.empty();
                 }
-            });
+
+            } else { 
+                if( 0 != Arrow.or(waits, [note]).length )
+                {
+                    // OR will only trigger one event to all callback.
+                    Arrow.one2many(note, _.map( procs, THIS.wrap_p, THIS ) );
+                    waits.__triggered.empty();
+                }
+            }
         });
     });
 }
