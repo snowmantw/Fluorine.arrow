@@ -9,6 +9,7 @@ app.configure(function()
     app.use(express.bodyParser());
     app.use(express.methodOverride());
     app.use('/library',express.static( __dirname + '/../library'));
+    app.use('/spec',express.static( __dirname + '/../spec'));
     app.use(app.router);
 });
 
